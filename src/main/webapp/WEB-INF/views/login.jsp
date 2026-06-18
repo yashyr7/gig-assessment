@@ -47,6 +47,10 @@ String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 					autocomplete="current-password"
 					required>
 
+				<div class="auth-link-row">
+					<a href="${pageContext.request.contextPath}/forgot-password">Forgot password?</a>
+				</div>
+
 				<% if (!errorMessage.isBlank()) { %>
 					<p class="error-message" role="alert"><%= errorMessage %></p>
 				<% } %>

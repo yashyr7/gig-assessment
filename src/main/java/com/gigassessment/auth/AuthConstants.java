@@ -6,6 +6,7 @@ public final class AuthConstants {
 	public static final String FLASH_ERROR = "flashError";
 	public static final String FLASH_INFO = "flashInfo";
 	public static final String LAST_USERNAME = "lastUsername";
+	public static final String RESET_VERIFIED_USERNAME = "resetVerifiedUsername";
 	public static final int SESSION_TIMEOUT_SECONDS = 15 * 60;
 	
 	private AuthConstants() {}

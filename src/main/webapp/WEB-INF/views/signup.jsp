@@ -1,10 +1,12 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
     pageEncoding="UTF-8"%>
 <%@ page import="com.gigassessment.security.HtmlEscaper" %>
+<%@ page import="java.time.LocalDate" %>
 <%
 String errorMessage = HtmlEscaper.escape(request.getAttribute("error"));
 String lastUsername = HtmlEscaper.escape(request.getAttribute("lastUsername"));
 String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
+int currentYear = LocalDate.now().getYear();
 %>
 
 <!DOCTYPE html>
@@ -36,6 +38,45 @@ String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 					maxlength="128"
 					value="<%= lastUsername %>"
 					required>
+
+				<div class="date-field">
+					<label class="date-field-label" id="signup-dob-label">Date of birth</label>
+					<div class="date-select-grid" aria-labelledby="signup-dob-label">
+						<div class="date-select-wrap">
+							<select class="date-select" name="dateMonth" aria-label="Birth month" autocomplete="bday-month" required>
+								<option value="" selected disabled>Month</option>
+								<option value="1">January</option>
+								<option value="2">February</option>
+								<option value="3">March</option>
+								<option value="4">April</option>
+								<option value="5">May</option>
+								<option value="6">June</option>
+								<option value="7">July</option>
+								<option value="8">August</option>
+								<option value="9">September</option>
+								<option value="10">October</option>
+								<option value="11">November</option>
+								<option value="12">December</option>
+							</select>
+						</div>
+						<div class="date-select-wrap">
+							<select class="date-select" name="dateDay" aria-label="Birth day" autocomplete="bday-day" required>
+								<option value="" selected disabled>Day</option>
+								<% for (int day = 1; day <= 31; day++) { %>
+									<option value="<%= day %>"><%= day %></option>
+								<% } %>
+							</select>
+						</div>
+						<div class="date-select-wrap">
+							<select class="date-select" name="dateYear" aria-label="Birth year" autocomplete="bday-year" required>
+								<option value="" selected disabled>Year</option>
+								<% for (int year = currentYear; year >= 1900; year--) { %>
+									<option value="<%= year %>"><%= year %></option>
+								<% } %>
+							</select>
+						</div>
+					</div>
+				</div>
 
 				<label class="visually-hidden" for="password">Password</label>
 				<input

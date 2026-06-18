@@ -2,6 +2,7 @@ package com.gigassessment.auth;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -58,11 +59,15 @@ public final class AuthService {
 		}
 	}
 
-	public SignupResult register(String username, char[] password, char[] confirmedPassword) {
+	public SignupResult register(String username, LocalDate dateOfBirth, char[] password, char[] confirmedPassword) {
 		String normalizedUsername = username == null ? "" : username.trim();
 
 		if (!isValidUsername(normalizedUsername)) {
 			return SignupResult.invalidUsername();
+		}
+
+		if (!isValidDateOfBirth(dateOfBirth)) {
+			return SignupResult.invalidDateOfBirth();
 		}
 
 		if (!isValidSignupPassword(password)) {
@@ -75,7 +80,7 @@ public final class AuthService {
 
 		try {
 			String passwordCredential = PasswordHasher.hash(password).encode();
-			boolean created = userRepository.createUser(normalizedUsername, passwordCredential);
+			boolean created = userRepository.createUser(normalizedUsername, dateOfBirth, passwordCredential);
 
 			if (!created) {
 				return SignupResult.usernameTaken();
@@ -84,6 +89,59 @@ public final class AuthService {
 			return SignupResult.success(new AuthUser(normalizedUsername));
 		} catch (IllegalArgumentException | IllegalStateException e) {
 			return SignupResult.systemError();
+		}
+	}
+
+	public PasswordResetVerificationResult verifyPasswordResetIdentity(String username, LocalDate dateOfBirth) {
+		String normalizedUsername = username == null ? "" : username.trim();
+
+		if (!isValidUsername(normalizedUsername) || !isValidDateOfBirth(dateOfBirth)) {
+			return PasswordResetVerificationResult.invalid();
+		}
+
+		try {
+			Optional<UserRecord> optionalUser = userRepository.findByUsername(normalizedUsername);
+			if (optionalUser.isEmpty()) {
+				return PasswordResetVerificationResult.invalid();
+			}
+
+			UserRecord user = optionalUser.get();
+			if (!dateOfBirth.equals(user.dateOfBirth())) {
+				return PasswordResetVerificationResult.invalid();
+			}
+
+			return PasswordResetVerificationResult.success(user.username());
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			return PasswordResetVerificationResult.systemError();
+		}
+	}
+
+	public PasswordResetResult resetPassword(String username, char[] password, char[] confirmedPassword) {
+		String normalizedUsername = username == null ? "" : username.trim();
+
+		if (!isValidUsername(normalizedUsername)) {
+			return PasswordResetResult.invalid();
+		}
+
+		if (!isValidSignupPassword(password)) {
+			return PasswordResetResult.weakPassword();
+		}
+
+		if (!Arrays.equals(password, confirmedPassword)) {
+			return PasswordResetResult.passwordMismatch();
+		}
+
+		try {
+			String passwordCredential = PasswordHasher.hash(password).encode();
+			boolean updated = userRepository.updatePassword(normalizedUsername, passwordCredential);
+
+			if (!updated) {
+				return PasswordResetResult.invalid();
+			}
+
+			return PasswordResetResult.success();
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			return PasswordResetResult.systemError();
 		}
 	}
 
@@ -96,6 +154,10 @@ public final class AuthService {
 
 	private boolean isValidUsername(String username) {
 		return !username.isBlank() && username.length() <= MAX_USERNAME_LENGTH;
+	}
+
+	private boolean isValidDateOfBirth(LocalDate dateOfBirth) {
+		return dateOfBirth != null && !dateOfBirth.isAfter(LocalDate.now());
 	}
 
 	private boolean isValidSignupPassword(char[] password) {
@@ -153,6 +215,10 @@ public final class AuthService {
 			return new SignupResult(SignupStatus.INVALID_USERNAME, null);
 		}
 
+		public static SignupResult invalidDateOfBirth() {
+			return new SignupResult(SignupStatus.INVALID_DATE_OF_BIRTH, null);
+		}
+
 		public static SignupResult weakPassword() {
 			return new SignupResult(SignupStatus.WEAK_PASSWORD, null);
 		}
@@ -173,9 +239,63 @@ public final class AuthService {
 	public enum SignupStatus {
 		SUCCESS,
 		INVALID_USERNAME,
+		INVALID_DATE_OF_BIRTH,
 		WEAK_PASSWORD,
 		PASSWORD_MISMATCH,
 		USERNAME_TAKEN,
+		SYSTEM_ERROR
+	}
+
+	public record PasswordResetVerificationResult(
+			PasswordResetVerificationStatus status,
+			String username
+	) {
+		public static PasswordResetVerificationResult success(String username) {
+			return new PasswordResetVerificationResult(PasswordResetVerificationStatus.SUCCESS, username);
+		}
+
+		public static PasswordResetVerificationResult invalid() {
+			return new PasswordResetVerificationResult(PasswordResetVerificationStatus.INVALID, null);
+		}
+
+		public static PasswordResetVerificationResult systemError() {
+			return new PasswordResetVerificationResult(PasswordResetVerificationStatus.SYSTEM_ERROR, null);
+		}
+	}
+
+	public enum PasswordResetVerificationStatus {
+		SUCCESS,
+		INVALID,
+		SYSTEM_ERROR
+	}
+
+	public record PasswordResetResult(PasswordResetStatus status) {
+		public static PasswordResetResult success() {
+			return new PasswordResetResult(PasswordResetStatus.SUCCESS);
+		}
+
+		public static PasswordResetResult invalid() {
+			return new PasswordResetResult(PasswordResetStatus.INVALID);
+		}
+
+		public static PasswordResetResult weakPassword() {
+			return new PasswordResetResult(PasswordResetStatus.WEAK_PASSWORD);
+		}
+
+		public static PasswordResetResult passwordMismatch() {
+			return new PasswordResetResult(PasswordResetStatus.PASSWORD_MISMATCH);
+		}
+
+		public static PasswordResetResult systemError() {
+			return new PasswordResetResult(PasswordResetStatus.SYSTEM_ERROR);
+		}
+	}
+
+	public enum PasswordResetStatus {
+		SUCCESS,
+		INVALID,
+		WEAK_PASSWORD,
+		PASSWORD_MISMATCH,
 		SYSTEM_ERROR
 	}
 }

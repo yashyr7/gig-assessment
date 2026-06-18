@@ -5,9 +5,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.sql.Date;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 
 import com.gigassessment.db.Database;
@@ -16,7 +18,7 @@ public final class UserRepository {
 
 	public Optional<UserRecord> findByUsername(String username) {
 		String sql = """
-				SELECT id, username, password_hash, failed_login_count, locked_until
+				SELECT id, username, date_of_birth, password_hash, failed_login_count, locked_until
 				FROM users
 				WHERE username = ?
 				LIMIT 1
@@ -35,10 +37,13 @@ public final class UserRepository {
 
 				Timestamp lockedUntilValue = resultSet.getTimestamp("locked_until");
 				Instant lockedUntil = lockedUntilValue == null ? null : lockedUntilValue.toInstant();
+				Date dateOfBirthValue = resultSet.getDate("date_of_birth");
+				LocalDate dateOfBirth = dateOfBirthValue == null ? null : dateOfBirthValue.toLocalDate();
 
 				return Optional.of(new UserRecord(
 						resultSet.getLong("id"),
 						resultSet.getString("username"),
+						dateOfBirth,
 						resultSet.getString("password_hash"),
 						resultSet.getInt("failed_login_count"),
 						lockedUntil
@@ -49,10 +54,10 @@ public final class UserRepository {
 		}
 	}
 
-	public boolean createUser(String username, String passwordCredential) {
+	public boolean createUser(String username, LocalDate dateOfBirth, String passwordCredential) {
 		String sql = """
-				INSERT INTO users (username, password_hash)
-				VALUES (?, ?)
+				INSERT INTO users (username, date_of_birth, password_hash)
+				VALUES (?, ?, ?)
 				""";
 
 		try (
@@ -60,7 +65,8 @@ public final class UserRepository {
 				PreparedStatement statement = connection.prepareStatement(sql);
 		) {
 			statement.setString(1, username);
-			statement.setString(2, passwordCredential);
+			statement.setDate(2, java.sql.Date.valueOf(dateOfBirth));
+			statement.setString(3, passwordCredential);
 
 			return statement.executeUpdate() == 1;
 		} catch (SQLIntegrityConstraintViolationException e) {
@@ -70,6 +76,28 @@ public final class UserRepository {
 				return false;
 			}
 			throw new IllegalStateException("Unable to create user: " + username, e);
+		}
+	}
+
+	public boolean updatePassword(String username, String passwordCredential) {
+		String sql = """
+				UPDATE users
+				SET password_hash = ?,
+				    failed_login_count = 0,
+				    locked_until = NULL
+				WHERE username = ?
+				""";
+
+		try (
+				Connection connection = Database.getConnection();
+				PreparedStatement statement = connection.prepareStatement(sql);
+		) {
+			statement.setString(1, passwordCredential);
+			statement.setString(2, username);
+
+			return statement.executeUpdate() == 1;
+		} catch (SQLException e) {
+			throw new IllegalStateException("Unable to update password for user: " + username, e);
 		}
 	}
 

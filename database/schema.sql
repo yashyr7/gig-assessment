@@ -7,6 +7,7 @@ USE gig_assessment;
 CREATE TABLE users (
 	id BIGINT PRIMARY KEY AUTO_INCREMENT,
 	username VARCHAR(128) NOT NULL,
+	date_of_birth DATE NOT NULL,
 	password_hash VARCHAR(512) NOT NULL,
 	failed_login_count INT NOT NULL DEFAULT 0,
   	locked_until TIMESTAMP NULL,
