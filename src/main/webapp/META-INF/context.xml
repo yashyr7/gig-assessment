@@ -1,0 +1,14 @@
+<Context>
+	<Resource
+		name="jdbc/GigAssessmentDB"
+		auth="Container"
+		type="javax.sql.DataSource"
+		driverClassName="com.mysql.cj.jdbc.Driver"
+		url="jdbc:mysql://localhost:3306/gig_assessment?useSSL=false&amp;serverTimezone=UTC"
+		username="admin"
+		password="12345678"
+		maxActive="20"
+		minIdle="2"
+		maxIdle="10"
+		maxWait="10000" />
+</Context>

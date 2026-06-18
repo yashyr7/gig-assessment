@@ -1,0 +1,181 @@
+package com.gigassessment.auth;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.Optional;
+
+public final class AuthService {
+	private static final int MAX_USERNAME_LENGTH = 128;
+	private static final int MIN_PASSWORD_LENGTH = 8;
+	private static final int MAX_PASSWORD_LENGTH = 1024;
+	private static final int MAX_FAILED_ATTEMPTS = 5;
+	private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(5);
+
+	private final UserRepository userRepository = new UserRepository();
+
+	public LoginResult authenticate(String username, char[] password) {
+		String normalizedUsername = username == null ? "" : username.trim();
+
+		if (!isValidLoginShape(normalizedUsername, password)) {
+			return LoginResult.invalid();
+		}
+
+		try {
+			Optional<UserRecord> optionalUser = userRepository.findByUsername(normalizedUsername);
+
+			if (optionalUser.isEmpty()) {
+				return LoginResult.invalid();
+			}
+
+			UserRecord user = optionalUser.get();
+
+			if (user.isLocked()) {
+				return LoginResult.locked(Duration.between(Instant.now(), user.lockedUntil()));
+			}
+
+			PasswordHasher.PasswordCredential credential =
+					PasswordHasher.PasswordCredential.parse(user.passwordCredential());
+
+			if (PasswordHasher.verify(password, credential)) {
+				userRepository.recordSuccessfulLogin(user.id());
+				return LoginResult.success(new AuthUser(user.username()));
+			}
+
+			int failedLoginCount = nextFailedLoginCount(user);
+			Instant lockedUntil = failedLoginCount >= MAX_FAILED_ATTEMPTS
+					? Instant.now().plus(LOCKOUT_DURATION)
+					: null;
+			userRepository.recordFailedLogin(user.id(), failedLoginCount, lockedUntil);
+
+			if (lockedUntil != null) {
+				return LoginResult.locked(Duration.between(Instant.now(), lockedUntil));
+			}
+
+			return LoginResult.invalid();
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			return LoginResult.systemError();
+		}
+	}
+
+	public SignupResult register(String username, char[] password, char[] confirmedPassword) {
+		String normalizedUsername = username == null ? "" : username.trim();
+
+		if (!isValidUsername(normalizedUsername)) {
+			return SignupResult.invalidUsername();
+		}
+
+		if (!isValidSignupPassword(password)) {
+			return SignupResult.weakPassword();
+		}
+
+		if (!Arrays.equals(password, confirmedPassword)) {
+			return SignupResult.passwordMismatch();
+		}
+
+		try {
+			String passwordCredential = PasswordHasher.hash(password).encode();
+			boolean created = userRepository.createUser(normalizedUsername, passwordCredential);
+
+			if (!created) {
+				return SignupResult.usernameTaken();
+			}
+
+			return SignupResult.success(new AuthUser(normalizedUsername));
+		} catch (IllegalArgumentException | IllegalStateException e) {
+			return SignupResult.systemError();
+		}
+	}
+
+	private boolean isValidLoginShape(String username, char[] password) {
+		return isValidUsername(username)
+				&& password != null
+				&& password.length > 0
+				&& password.length <= MAX_PASSWORD_LENGTH;
+	}
+
+	private boolean isValidUsername(String username) {
+		return !username.isBlank() && username.length() <= MAX_USERNAME_LENGTH;
+	}
+
+	private boolean isValidSignupPassword(char[] password) {
+		return password != null
+				&& password.length >= MIN_PASSWORD_LENGTH
+				&& password.length <= MAX_PASSWORD_LENGTH;
+	}
+
+	private int nextFailedLoginCount(UserRecord user) {
+		if (user.lockedUntil() != null && !user.isLocked()) {
+			return 1;
+		}
+
+		return Math.min(user.failedLoginCount() + 1, MAX_FAILED_ATTEMPTS);
+	}
+
+	public record LoginResult(
+			Status status,
+			AuthUser user,
+			Duration remainingLockout
+	) {
+		public static LoginResult success(AuthUser user) {
+			return new LoginResult(Status.SUCCESS, user, Duration.ZERO);
+		}
+
+		public static LoginResult invalid() {
+			return new LoginResult(Status.INVALID, null, Duration.ZERO);
+		}
+
+		public static LoginResult locked(Duration remainingLockout) {
+			return new LoginResult(Status.LOCKED, null, remainingLockout);
+		}
+
+		public static LoginResult systemError() {
+			return new LoginResult(Status.SYSTEM_ERROR, null, Duration.ZERO);
+		}
+	}
+
+	public enum Status {
+		SUCCESS,
+		INVALID,
+		LOCKED,
+		SYSTEM_ERROR
+	}
+
+	public record SignupResult(
+			SignupStatus status,
+			AuthUser user
+	) {
+		public static SignupResult success(AuthUser user) {
+			return new SignupResult(SignupStatus.SUCCESS, user);
+		}
+
+		public static SignupResult invalidUsername() {
+			return new SignupResult(SignupStatus.INVALID_USERNAME, null);
+		}
+
+		public static SignupResult weakPassword() {
+			return new SignupResult(SignupStatus.WEAK_PASSWORD, null);
+		}
+
+		public static SignupResult passwordMismatch() {
+			return new SignupResult(SignupStatus.PASSWORD_MISMATCH, null);
+		}
+
+		public static SignupResult usernameTaken() {
+			return new SignupResult(SignupStatus.USERNAME_TAKEN, null);
+		}
+
+		public static SignupResult systemError() {
+			return new SignupResult(SignupStatus.SYSTEM_ERROR, null);
+		}
+	}
+
+	public enum SignupStatus {
+		SUCCESS,
+		INVALID_USERNAME,
+		WEAK_PASSWORD,
+		PASSWORD_MISMATCH,
+		USERNAME_TAKEN,
+		SYSTEM_ERROR
+	}
+}

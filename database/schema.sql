@@ -1,0 +1,18 @@
+CREATE DATABASE IF NOT EXISTS gig_assessment
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+
+USE gig_assessment;
+
+CREATE TABLE users (
+	id BIGINT PRIMARY KEY AUTO_INCREMENT,
+	username VARCHAR(128) NOT NULL,
+	password_hash VARCHAR(512) NOT NULL,
+	failed_login_count INT NOT NULL DEFAULT 0,
+  	locked_until TIMESTAMP NULL,
+  	last_login_at TIMESTAMP NULL,
+  	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+	CONSTRAINT unique_users_username UNIQUE (username)
+);

@@ -3,7 +3,6 @@
 <%@ page import="com.gigassessment.security.HtmlEscaper" %>
 <%
 String errorMessage = HtmlEscaper.escape(request.getAttribute("error"));
-String infoMessage = HtmlEscaper.escape(request.getAttribute("info"));
 String lastUsername = HtmlEscaper.escape(request.getAttribute("lastUsername"));
 String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 %>
@@ -13,17 +12,17 @@ String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login</title>
+<title>Create Account</title>
 <link rel="stylesheet" href="${pageContext.request.contextPath}/css/style.css">
 </head>
 <body>
 	<main class="auth-page">
-		<section class="login-component" aria-labelledby="login-title">
+		<section class="login-component" aria-labelledby="signup-title">
 			<header class="login-header">
-				<h1 id="login-title">Welcome Back</h1>
+				<h1 id="signup-title">Create Account</h1>
 			</header>
 
-			<form class="login-form" action="${pageContext.request.contextPath}/login" method="post">
+			<form class="login-form" action="${pageContext.request.contextPath}/signup" method="post">
 				<input type="hidden" name="csrfToken" value="<%= csrfToken %>">
 
 				<label class="visually-hidden" for="username">Username</label>
@@ -32,8 +31,9 @@ String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 					id="username"
 					name="username"
 					type="text"
-					placeholder="Enter your username"
+					placeholder="Choose a username"
 					autocomplete="username"
+					maxlength="128"
 					value="<%= lastUsername %>"
 					required>
 
@@ -43,21 +43,31 @@ String csrfToken = HtmlEscaper.escape(request.getAttribute("csrfToken"));
 					id="password"
 					name="password"
 					type="password"
-					placeholder="Enter your password"
-					autocomplete="current-password"
+					placeholder="Create a password"
+					autocomplete="new-password"
+					minlength="8"
 					required>
+
+				<label class="visually-hidden" for="confirmedPassword">Confirm password</label>
+				<input
+					class="input-box"
+					id="confirmedPassword"
+					name="confirmedPassword"
+					type="password"
+					placeholder="Confirm your password"
+					autocomplete="new-password"
+					minlength="8"
+					required>
+
+				<p class="field-help">Password must be at least 8 characters.</p>
 
 				<% if (!errorMessage.isBlank()) { %>
 					<p class="error-message" role="alert"><%= errorMessage %></p>
 				<% } %>
 
-				<% if (!infoMessage.isBlank()) { %>
-					<p class="info-message"><%= infoMessage %></p>
-				<% } %>
-
 				<div class="button-row">
-					<button class="primary-button" type="submit">Login</button>
-					<a class="secondary-button button-link" href="${pageContext.request.contextPath}/signup">Sign Up</a>
+					<button class="primary-button" type="submit">Create Account</button>
+					<a class="secondary-button button-link" href="${pageContext.request.contextPath}/login">Login</a>
 				</div>
 			</form>
 		</section>

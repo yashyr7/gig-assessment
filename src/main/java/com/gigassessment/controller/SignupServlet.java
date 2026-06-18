@@ -1,53 +1,46 @@
 package com.gigassessment.controller;
 
-import java.io.*;
-import java.time.Duration;
+import java.io.IOException;
 
 import com.gigassessment.auth.AuthConstants;
 import com.gigassessment.auth.AuthService;
-import com.gigassessment.auth.AuthService.LoginResult;
+import com.gigassessment.auth.AuthService.SignupResult;
 import com.gigassessment.auth.AuthUser;
 import com.gigassessment.auth.PasswordHasher;
 import com.gigassessment.security.CsrfTokenService;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.WebServlet;
 
-@WebServlet("/login")
-public class LoginServlet extends HttpServlet {
+@WebServlet("/signup")
+public class SignupServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	
-	private final AuthService authService= new AuthService();
-	
-	public LoginServlet() {
-        super();
-    }
-	
+
+	private final AuthService authService = new AuthService();
+
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-		throws ServletException, IOException {
+			throws ServletException, IOException {
 		if (isAuthenticated(req)) {
 			resp.sendRedirect(req.getContextPath() + "/core/dashboard");
 			return;
 		}
-		
+
 		HttpSession session = req.getSession(true);
 		consumeFlash(session, req, AuthConstants.FLASH_ERROR, "error");
-		consumeFlash(session, req, AuthConstants.FLASH_INFO, "info");
 		consumeFlash(session, req, AuthConstants.LAST_USERNAME, "lastUsername");
-		
+
 		req.setAttribute("csrfToken", CsrfTokenService.ensureToken(session));
-
-		req.getRequestDispatcher("/WEB-INF/views/login.jsp").forward(req, resp);
-
+		req.getRequestDispatcher("/WEB-INF/views/signup.jsp").forward(req, resp);
 	}
-	
+
 	@Override
-	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+			throws ServletException, IOException {
 		if (!CsrfTokenService.isValid(req)) {
 			resp.sendError(HttpServletResponse.SC_FORBIDDEN);
 			return;
@@ -55,46 +48,61 @@ public class LoginServlet extends HttpServlet {
 
 		String username = safeTrim(req.getParameter("username"));
 		char[] password = toPasswordChars(req.getParameter("password"));
-		
+		char[] confirmedPassword = toPasswordChars(req.getParameter("confirmedPassword"));
+
 		try {
-			LoginResult result = authService.authenticate(username, password);
-			
+			SignupResult result = authService.register(username, password, confirmedPassword);
+
 			switch (result.status()) {
-			case SUCCESS -> completeLogin(req, resp, result.user());
-			
-			case LOCKED -> redirectWithError(req, resp, username, lockoutMessage(result.remainingLockout()));
-			
+			case SUCCESS -> completeSignup(req, resp, result.user());
+
+			case INVALID_USERNAME -> redirectWithError(
+					req,
+					resp,
+					username,
+					"Username is required and must be 128 characters or fewer.");
+
+			case WEAK_PASSWORD -> redirectWithError(
+					req,
+					resp,
+					username,
+					"Password must be at least 8 characters.");
+
+			case PASSWORD_MISMATCH -> redirectWithError(
+					req,
+					resp,
+					username,
+					"Passwords do not match.");
+
+			case USERNAME_TAKEN -> redirectWithError(
+					req,
+					resp,
+					username,
+					"That username is already in use. Try logging in or choose another one.");
+
 			case SYSTEM_ERROR -> {
-				getServletContext().log("Login failed because the authentication system had an internal error.");
-				redirectWithError(req, resp, username, "Login is temporarily unavailable. Please try again later.");
+				getServletContext().log("Signup failed because the authentication system had an internal error.");
+				redirectWithError(req, resp, username, "Signup is temporarily unavailable. Please try again later.");
 			}
-			
-			case INVALID -> redirectWithError(req, resp, username, "Invalid username or password.");
-			
+
 			default -> throw new IllegalArgumentException("Unexpected value: " + result.status());
 			}
 		} finally {
 			PasswordHasher.clear(password);
+			PasswordHasher.clear(confirmedPassword);
 		}
-		
 	}
-	
+
 	private boolean isAuthenticated(HttpServletRequest req) {
 		HttpSession session = req.getSession(false);
-		
-		if (session!= null && session.getAttribute(AuthConstants.AUTHENTICATED_USER) != null) {
-			return true;
-		}
-		
-		return false;
+		return session != null && session.getAttribute(AuthConstants.AUTHENTICATED_USER) != null;
 	}
-	
-	private void completeLogin(
+
+	private void completeSignup(
 			HttpServletRequest request,
 			HttpServletResponse response,
 			AuthUser user
 	) throws IOException {
-
 		HttpSession oldSession = request.getSession(false);
 		if (oldSession != null) {
 			oldSession.invalidate();
@@ -103,32 +111,24 @@ public class LoginServlet extends HttpServlet {
 		HttpSession session = request.getSession(true);
 		session.setMaxInactiveInterval(AuthConstants.SESSION_TIMEOUT_SECONDS);
 		session.setAttribute(AuthConstants.AUTHENTICATED_USER, user);
-
 		CsrfTokenService.rotateToken(session);
 
 		response.sendRedirect(request.getContextPath() + "/core/dashboard");
 	}
-	
+
 	private void redirectWithError(
 			HttpServletRequest request,
 			HttpServletResponse response,
 			String username,
 			String message
 	) throws IOException {
-
 		HttpSession session = request.getSession(true);
 		session.setAttribute(AuthConstants.FLASH_ERROR, message);
 		session.setAttribute(AuthConstants.LAST_USERNAME, username);
 
-		response.sendRedirect(request.getContextPath() + "/login");
+		response.sendRedirect(request.getContextPath() + "/signup");
 	}
-	
-	private String lockoutMessage(Duration remainingLockout) {
-		long seconds = Math.max(1, remainingLockout.toSeconds());
-		long minutes = Math.max(1, (long) Math.ceil(seconds / 60.0));
-		return "Too many failed attempts. Try again in about " + minutes + " minute(s).";
-	}
-	
+
 	private void consumeFlash(HttpSession session, HttpServletRequest request, String sessionName, String requestName) {
 		Object value = session.getAttribute(sessionName);
 		if (value != null) {
@@ -136,7 +136,7 @@ public class LoginServlet extends HttpServlet {
 			session.removeAttribute(sessionName);
 		}
 	}
-	
+
 	private String safeTrim(String value) {
 		return value == null ? "" : value.trim();
 	}
@@ -144,5 +144,4 @@ public class LoginServlet extends HttpServlet {
 	private char[] toPasswordChars(String value) {
 		return value == null ? new char[0] : value.toCharArray();
 	}
-	
 }
