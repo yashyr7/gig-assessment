@@ -42,7 +42,7 @@ int currentYear = LocalDate.now().getYear();
 						type="password"
 						placeholder="Enter new password"
 						autocomplete="new-password"
-						minlength="8"
+						minlength="5"
 						required>
 
 					<label class="visually-hidden" for="confirmedPassword">Confirm new password</label>
@@ -53,10 +53,10 @@ int currentYear = LocalDate.now().getYear();
 						type="password"
 						placeholder="Confirm new password"
 						autocomplete="new-password"
-						minlength="8"
+						minlength="5"
 						required>
 
-					<p class="field-help">Password must be at least 8 characters.</p>
+					<p class="field-help">Password must be at least 5 characters.</p>
 
 					<% if (!errorMessage.isBlank()) { %>
 						<p class="error-message" role="alert"><%= errorMessage %></p>

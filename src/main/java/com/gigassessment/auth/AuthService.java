@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public final class AuthService {
 	private static final int MAX_USERNAME_LENGTH = 128;
-	private static final int MIN_PASSWORD_LENGTH = 8;
+	private static final int MIN_PASSWORD_LENGTH = 5;
 	private static final int MAX_PASSWORD_LENGTH = 1024;
 	private static final int MAX_FAILED_ATTEMPTS = 5;
 	private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(5);

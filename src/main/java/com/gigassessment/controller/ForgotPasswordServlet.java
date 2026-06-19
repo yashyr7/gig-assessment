@@ -117,7 +117,7 @@ public class ForgotPasswordServlet extends HttpServlet {
 					req,
 					resp,
 					username,
-					"Password must be at least 8 characters.");
+					"Password must be at least 5 characters.");
 
 			case PASSWORD_MISMATCH -> redirectWithError(
 					req,
